@@ -3,14 +3,18 @@
 This is a simple script to get the monthly utility usage from National Grid for NYC Metro customers only.
 
 ```bash
+# Create virtual env
+python -m venv ./venv
+
 # Install dependencies
-pip install -r script/requirements.txt
+source ./venv/bin/activate
+pip install -r requirements.txt
 
 # Install Playwright browser
 playwright install chromium
 
 # Run the script
-python3 script/nationalgridmetro.py <username> <password>
+python3 nationalgridmetro.py '<username>' '<password>'
 ```
 Example response:
 ```json
