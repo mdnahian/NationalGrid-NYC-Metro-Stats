@@ -1,4 +1,4 @@
-# National Grid NYC Metro API - Home Assistant Add-on
+# National Grid NYC Metro Stats - Home Assistant Add-on Repository
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -10,27 +10,37 @@
 ![Supports armv7 Architecture][armv7-shield]
 ![Supports i386 Architecture][i386-shield]
 
-_Home Assistant add-on to get usage and cost data from National Grid NYC Metro accounts via REST API._
+This repository contains Home Assistant add-ons for accessing National Grid NYC Metro utility data.
 
-## About
+## Add-ons
 
-This add-on provides a REST API to retrieve energy usage and cost data from National Grid NYC Metro accounts. It uses browser automation to securely access your account and provides the data in a clean JSON format.
+This repository contains the following add-ons:
 
-The add-on includes:
-- **Token caching** for efficient API calls
-- **Current period estimation** based on elapsed billing days
-- **Health monitoring** with built-in endpoints
-- **Secure credential handling** through Home Assistant configuration
+### [National Grid NYC Metro API](./nationalgrid-nyc-metro/)
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Stability](https://img.shields.io/badge/stability-stable-green.svg)
+
+Get usage and cost data from National Grid NYC Metro accounts via REST API. Provides historical usage data, cost tracking, and current period estimation through a simple REST API that integrates seamlessly with Home Assistant sensors and automations.
+
+**Features:**
+- ✅ Historical usage and cost data
+- ✅ Current period estimation 
+- ✅ Token caching for efficiency
+- ✅ RESTful API endpoints
+- ✅ Multi-architecture support
+- ✅ Secure credential handling
 
 ## Installation
 
-1. **Add the repository** to your Home Assistant instance:
-   - Go to **Supervisor** → **Add-on Store** → **⋮** → **Repositories**
-   - Add: `https://github.com/mdnahian/NationalGrid-NYC-Metro-Stats`
+1. **Add this repository to Home Assistant**:
+   - Go to **Supervisor** → **Add-on Store** → **⋮** (three dots menu) → **Repositories**
+   - Add repository URL: `https://github.com/mdnahian/NationalGrid-NYC-Metro-Stats`
+   - Click **Add**
 
 2. **Install the add-on**:
    - Find "National Grid NYC Metro API" in the add-on store
-   - Click **Install**
+   - Click on it and then click **Install**
 
 3. **Configure the add-on**:
    - Go to the **Configuration** tab
@@ -41,86 +51,14 @@ The add-on includes:
    - Click **Start**
    - Optionally enable **Auto start** and **Watchdog**
 
-## Configuration
+## Quick Start
 
-Add-on configuration:
+After installation, the API will be available at:
+- **Health Check**: `http://homeassistant.local:50583/health`
+- **Usage Data**: `http://homeassistant.local:50583/usage`
+- **API Info**: `http://homeassistant.local:50583/`
 
-```yaml
-username: "your_email@example.com"
-password: "your_password"
-log_level: "info"
-```
-
-### Option: `username`
-
-Your National Grid account username (email address).
-
-### Option: `password`
-
-Your National Grid account password.
-
-### Option: `log_level`
-
-Controls the level of log output. Valid values:
-- `trace` - Very detailed debug information
-- `debug` - Debug information  
-- `info` - General information (default)
-- `notice` - Important information
-- `warning` - Warning messages
-- `error` - Error messages only
-- `fatal` - Critical errors only
-
-## Usage
-
-Once the add-on is running, the API will be available at:
-
-**Base URL**: `http://homeassistant.local:50583`
-
-### API Endpoints
-
-- **GET /** - API information and documentation
-- **GET /health** - Health check endpoint
-- **GET /usage** - Get complete usage and cost data
-
-### Example API Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "usage_over_time": [
-      {
-        "start_date": "2025-05-30T00:00:00-04:00",
-        "end_date": "2025-07-01T00:00:00-04:00",
-        "usage_amount": 53.0,
-        "usage_unit": "therms",
-        "cost_amount": 288.04,
-        "cost_unit": "USD"
-      }
-    ],
-    "current_month_estimate": {
-      "period_start": "2025-05-30T00:00:00-04:00",
-      "period_end": "2025-07-01T00:00:00-04:00",
-      "actual_period_usage": 53.0,
-      "actual_period_cost": 288.04,
-      "is_current_period": false
-    },
-    "summary": {
-      "total_usage": 3103.0,
-      "total_cost": 10814.1,
-      "number_of_bills": 24,
-      "usage_unit": "therms",
-      "cost_unit": "USD"
-    }
-  }
-}
-```
-
-## Integration with Home Assistant
-
-### REST Sensor Example
-
-You can create sensors in Home Assistant to track your energy usage:
+### Example Home Assistant Configuration
 
 ```yaml
 # configuration.yaml
@@ -140,51 +78,66 @@ sensor:
     device_class: monetary
 ```
 
-### Automation Example
+## Repository Structure
 
-```yaml
-# automations.yaml
-- alias: "High Gas Usage Alert"
-  trigger:
-    - platform: numeric_state
-      entity_id: sensor.national_grid_total_usage
-      above: 100
-  action:
-    - service: notify.mobile_app_your_phone
-      data:
-        message: "High gas usage detected: {{ states('sensor.national_grid_total_usage') }} therms"
+```
+├── repository.json                 # Repository metadata
+├── README.md                      # This file
+├── DOCKER.md                      # Technical documentation
+└── nationalgrid-nyc-metro/        # Add-on directory
+    ├── config.json                # Add-on configuration
+    ├── Dockerfile                 # Container build file
+    ├── build.json                 # Multi-arch build config
+    ├── run.sh                     # Startup script
+    ├── README.md                  # Add-on documentation
+    ├── CHANGELOG.md               # Version history
+    └── app/                       # Flask application
+        ├── app.py                 # API server
+        ├── requirements.txt       # Dependencies
+        └── internal/              # National Grid client
 ```
 
-## Troubleshooting
+## Development
 
-### Add-on won't start
+This repository includes both standalone Python scripts and Home Assistant add-on packaging. For development:
 
-1. Check the add-on logs for error messages
-2. Verify your username and password are correct
-3. Ensure you have a valid National Grid NYC Metro account
+1. **Local Testing**: Use the Python scripts in the add-on's `app/` directory
+2. **Add-on Development**: Follow Home Assistant's add-on development guidelines
+3. **Multi-arch Support**: Builds are configured for multiple architectures
 
-### Authentication errors
+## Documentation
 
-- Double-check your credentials in the add-on configuration
-- Make sure your account isn't locked or requiring password reset
-- Try logging into the National Grid website manually first
-
-### No data returned
-
-- The API only returns data for completed billing periods
-- If you're in the middle of a billing cycle, you'll see the latest completed period
-- Check logs for any browser automation errors
+- **[Add-on README](./nationalgrid-nyc-metro/README.md)** - Complete add-on documentation
+- **[DOCKER.md](./DOCKER.md)** - Technical implementation details
+- **[CHANGELOG.md](./nationalgrid-nyc-metro/CHANGELOG.md)** - Version history
 
 ## Support
 
-For support:
-1. Check the [add-on logs](#) in Home Assistant
-2. Review the [troubleshooting section](#troubleshooting)
+For support and bug reports:
+1. Check the [add-on documentation](./nationalgrid-nyc-metro/README.md)
+2. Review the [troubleshooting section](./nationalgrid-nyc-metro/README.md#troubleshooting)
 3. Open an issue on [GitHub][issues]
+
+## Requirements
+
+- Home Assistant Supervisor
+- National Grid NYC Metro account
+- Internet access for browser automation
+
+## Security & Privacy
+
+- Credentials are stored securely within Home Assistant
+- No data is transmitted to third parties
+- Browser automation runs in isolated container
+- All authentication tokens are cached locally
 
 ## License
 
 MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+**Note**: This add-on uses browser automation to access National Grid's customer portal. Please ensure your account credentials are accurate and that you comply with National Grid's terms of service.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
