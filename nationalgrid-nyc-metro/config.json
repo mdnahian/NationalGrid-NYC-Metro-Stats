@@ -1,5 +1,5 @@
 {
-  "name": "National Grid NYC Metro API",
+  "name": "National Grid NYC Metro Stats",
   "version": "1.0.0",
   "slug": "nationalgrid_nyc_metro",
   "description": "Get usage and cost data from National Grid NYC Metro accounts via REST API",
