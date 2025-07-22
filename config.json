@@ -1,0 +1,44 @@
+{
+  "name": "National Grid NYC Metro API",
+  "version": "1.0.0",
+  "slug": "nationalgrid_nyc_metro",
+  "description": "Get usage and cost data from National Grid NYC Metro accounts via REST API",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "startup": "application",
+  "boot": "auto",
+  "init": false,
+  "ports": {
+    "50583/tcp": 50583
+  },
+  "ports_description": {
+    "50583/tcp": "Web interface and API"
+  },
+  "options": {
+    "username": "",
+    "password": "",
+    "log_level": "info"
+  },
+  "schema": {
+    "username": "str",
+    "password": "password",
+    "log_level": "list(trace|debug|info|notice|warning|error|fatal)?"
+  },
+  "environment": {
+    "LOG_FORMAT": "{TIMESTAMP} {LEVEL} {MESSAGE}"
+  },
+  "url": "https://github.com/mdnahian/NationalGrid-NYC-Metro-Stats",
+  "webui": "http://[HOST]:[PORT:50583]",
+  "ingress": false,
+  "panel_icon": "mdi:flash",
+  "hassio_api": false,
+  "hassio_role": "default",
+  "homeassistant_api": false,
+  "host_network": false,
+  "map": ["data:rw"],
+  "audio": false,
+  "video": false,
+  "gpio": false,
+  "devicetree": false,
+  "kernel_modules": false,
+  "apparmor": true
+} 

@@ -1,0 +1,77 @@
+# Git files
+.git/
+.gitignore
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+.env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation and markdown files in root
+README.md
+*.md
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Docker files themselves (except in app/ folder)
+Dockerfile
+.dockerignore
+run.sh
+
+# Node modules if any
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Config files that shouldn't be in container
+config.yaml
+.env
+.env.local
+.env.*.local
+
+# Token cache (will be created in container)
+.ngnycmetro/ 

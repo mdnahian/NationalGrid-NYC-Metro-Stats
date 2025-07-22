@@ -432,6 +432,196 @@ class NationalGridMetroClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def get_current_usage_data(self):
+        """Try to get current/real-time usage data using different GraphQL queries."""
+        if not self.customer_urn:
+            return {"success": False, "error": "Customer URN not available"}
+        
+        try:
+            # Try daily resolution for more recent data
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=90)  # Last 90 days
+            time_interval = f"{start_date.strftime('%Y-%m-%dT00:00:00-04:00')}/{end_date.strftime('%Y-%m-%dT23:59:59-04:00')}"
+            
+            # Try different GraphQL queries for current data
+            queries_to_try = [
+                # Query 1: Daily resolution for recent data
+                {
+                    "name": "Daily Usage",
+                    "query": {
+                        "operationName": "WDB_GetCostUsageReadsForBills",
+                        "variables": {
+                            "resolution": "DAY",  # Changed from BILL to DAY
+                            "timeInterval": time_interval,
+                            "last": 90,
+                            "aliased": False,
+                            "forceLegacyData": True,
+                            "customerURN": self.customer_urn,
+                            "locale": "en-US"
+                        },
+                        "query": """
+                        query WDB_GetCostUsageReadsForBills($customerURN: ID, $last: Int, $timeInterval: TimeInterval, $forceLegacyData: Boolean, $aliased: Boolean) {
+                          billingAccountByAuthContext(
+                            singlePremise: $customerURN
+                            forceLegacyData: $forceLegacyData
+                          ) {
+                            urn
+                            reads(
+                              last: $last
+                              during: $timeInterval
+                              orderBy: ASCENDING
+                            ) {
+                              urn
+                              timeInterval
+                              serviceQuantities {
+                                unit
+                                serviceQuantityIdentifier
+                                serviceQuantity {
+                                  value
+                                  __typename
+                                }
+                                __typename
+                              }
+                              usageCharges {
+                                value
+                                __typename
+                              }
+                              currentAmount {
+                                value
+                                __typename
+                              }
+                              __typename
+                            }
+                            __typename
+                          }
+                        }
+                        """
+                    }
+                },
+                # Query 2: Current usage reads
+                {
+                    "name": "Current Usage Reads",
+                    "query": {
+                        "operationName": "GetCurrentUsageReads",
+                        "variables": {
+                            "customerURN": self.customer_urn,
+                            "timeInterval": time_interval
+                        },
+                        "query": """
+                        query GetCurrentUsageReads($customerURN: ID, $timeInterval: TimeInterval) {
+                          billingAccountByAuthContext(singlePremise: $customerURN) {
+                            urn
+                            currentUsage(during: $timeInterval) {
+                              timeInterval
+                              serviceQuantities {
+                                unit
+                                serviceQuantityIdentifier
+                                serviceQuantity {
+                                  value
+                                  __typename
+                                }
+                                __typename
+                              }
+                              usageCharges {
+                                value
+                                __typename
+                              }
+                              __typename
+                            }
+                            __typename
+                          }
+                        }
+                        """
+                    }
+                },
+                # Query 3: Usage reads with different parameters
+                {
+                    "name": "Usage Reads",
+                    "query": {
+                        "operationName": "GetUsageReads", 
+                        "variables": {
+                            "customerURN": self.customer_urn,
+                            "timeInterval": time_interval,
+                            "last": 100
+                        },
+                        "query": """
+                        query GetUsageReads($customerURN: ID, $timeInterval: TimeInterval, $last: Int) {
+                          billingAccountByAuthContext(singlePremise: $customerURN) {
+                            urn
+                            usageReads(last: $last, during: $timeInterval, orderBy: DESCENDING) {
+                              urn
+                              timeInterval
+                              serviceQuantities {
+                                unit
+                                serviceQuantityIdentifier  
+                                serviceQuantity {
+                                  value
+                                  __typename
+                                }
+                                __typename
+                              }
+                              usageCharges {
+                                value
+                                __typename
+                              }
+                              currentAmount {
+                                value
+                                __typename
+                              }
+                              __typename
+                            }
+                            __typename
+                          }
+                        }
+                        """
+                    }
+                }
+            ]
+            
+            headers = {
+                'Authorization': f'Bearer {self.tokens["access_token"]}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            }
+            
+            results = {}
+            
+            async with aiohttp.ClientSession() as session:
+                for query_info in queries_to_try:
+                    try:
+                        async with session.post(
+                            f"{self.base_url}/ei/edge/apis/dsm-graphql-v1/cws/graphql",
+                            headers=headers,
+                            json=query_info["query"]
+                        ) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                results[query_info["name"]] = {
+                                    "success": True,
+                                    "data": data
+                                }
+                            else:
+                                results[query_info["name"]] = {
+                                    "success": False,
+                                    "error": f"HTTP {resp.status}",
+                                    "details": await resp.text()
+                                }
+                    except Exception as e:
+                        results[query_info["name"]] = {
+                            "success": False,
+                            "error": str(e)
+                        }
+            
+            return {
+                "success": True,
+                "query_results": results,
+                "time_interval": time_interval
+            }
+                        
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def process_usage_data(self, graphql_response):
         """Process GraphQL response into structured usage and cost data."""
         try:
@@ -456,8 +646,8 @@ class NationalGridMetroClient:
             cost_over_time = []
             total_usage = 0
             total_cost = 0
-            current_month_data = None
-            current_month = datetime.now().strftime('%Y-%m')
+            current_month_estimate = None
+            now = datetime.now()
             
             # Process each bill
             for bill in bills:
@@ -521,19 +711,82 @@ class NationalGridMetroClient:
                 
                 total_usage += bill_usage
                 total_cost += bill_cost
-                
-                # Check if this is current month
-                if start_date and start_date.startswith(current_month):
-                    current_month_data = period_data
             
-            # Calculate current month estimate if we have partial data
-            current_month_estimate = None
-            if current_month_data:
-                current_month_estimate = {
-                    "partial_usage": current_month_data["usage_amount"],
-                    "partial_cost": current_month_data["cost_amount"],
-                    "billing_period": current_month_data
-                }
+            # Find current month estimate by checking if we're in an active billing period
+            if usage_over_time:
+                # Get the most recent billing period
+                latest_period = usage_over_time[-1]
+                
+                try:
+                    # Parse dates to check if current date falls within the latest billing period
+                    # Handle ISO format with timezone offset (e.g., "2025-05-30T00:00:00-04:00")
+                    start_dt = datetime.fromisoformat(latest_period["start_date"])
+                    end_dt = datetime.fromisoformat(latest_period["end_date"])
+                    
+                    # Remove timezone info for comparison (convert to naive datetime)
+                    start_dt = start_dt.replace(tzinfo=None)
+                    end_dt = end_dt.replace(tzinfo=None)
+                    current_dt = now.replace(tzinfo=None)
+                    
+                    # Check if current date is within this billing period
+                    if start_dt <= current_dt <= end_dt:
+                        # We're in the current billing period - calculate estimate
+                        total_period_days = (end_dt - start_dt).days
+                        elapsed_days = (current_dt - start_dt).days
+                        
+                        if total_period_days > 0 and elapsed_days >= 0:
+                            # Calculate daily rates based on latest period
+                            daily_usage_rate = latest_period["usage_amount"] / total_period_days if total_period_days > 0 else 0
+                            daily_cost_rate = latest_period["cost_amount"] / total_period_days if total_period_days > 0 else 0
+                            
+                            # Estimate usage/cost for elapsed days
+                            estimated_usage_so_far = daily_usage_rate * elapsed_days
+                            estimated_cost_so_far = daily_cost_rate * elapsed_days
+                            
+                            # Projected usage/cost for full period
+                            projected_usage = daily_usage_rate * total_period_days
+                            projected_cost = daily_cost_rate * total_period_days
+                            
+                            current_month_estimate = {
+                                "period_start": latest_period["start_date"],
+                                "period_end": latest_period["end_date"],
+                                "total_period_days": total_period_days,
+                                "elapsed_days": elapsed_days,
+                                "estimated_usage_so_far": round(estimated_usage_so_far, 2),
+                                "estimated_cost_so_far": round(estimated_cost_so_far, 2),
+                                "projected_period_usage": round(projected_usage, 2),
+                                "projected_period_cost": round(projected_cost, 2),
+                                "actual_period_usage": latest_period["usage_amount"],
+                                "actual_period_cost": latest_period["cost_amount"],
+                                "usage_unit": latest_period["usage_unit"],
+                                "cost_unit": latest_period["cost_unit"],
+                                "is_current_period": True
+                            }
+                    else:
+                        # Not in current billing period, but provide info about the latest period
+                        current_month_estimate = {
+                            "period_start": latest_period["start_date"],
+                            "period_end": latest_period["end_date"],
+                            "actual_period_usage": latest_period["usage_amount"],
+                            "actual_period_cost": latest_period["cost_amount"],
+                            "usage_unit": latest_period["usage_unit"],
+                            "cost_unit": latest_period["cost_unit"],
+                            "is_current_period": False,
+                            "note": "Current date is outside the latest billing period"
+                        }
+                        
+                except Exception as date_error:
+                    # If date parsing fails, still provide latest period info
+                    current_month_estimate = {
+                        "period_start": latest_period["start_date"],
+                        "period_end": latest_period["end_date"],
+                        "actual_period_usage": latest_period["usage_amount"],
+                        "actual_period_cost": latest_period["cost_amount"],
+                        "usage_unit": latest_period["usage_unit"],
+                        "cost_unit": latest_period["cost_unit"],
+                        "is_current_period": False,
+                        "note": f"Date parsing error: {str(date_error)}"
+                    }
             
             return {
                 "success": True,
