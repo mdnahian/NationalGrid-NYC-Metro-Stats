@@ -15,13 +15,14 @@ app = Flask(__name__)
 
 async def get_usage_data():
     """Get usage data using the National Grid client."""
-    username = os.getenv('USERNAME')
-    password = os.getenv('PASSWORD')
+    # Support both USERNAME/PASSWORD and NATIONAL_GRID_USERNAME/NATIONAL_GRID_PASSWORD
+    username = os.getenv('USERNAME') or os.getenv('NATIONAL_GRID_USERNAME')
+    password = os.getenv('PASSWORD') or os.getenv('NATIONAL_GRID_PASSWORD')
     
     if not username or not password:
         return {
             "success": False,
-            "error": "Missing credentials. Please set USERNAME and PASSWORD environment variables."
+            "error": "Missing credentials. Please set USERNAME/PASSWORD or NATIONAL_GRID_USERNAME/NATIONAL_GRID_PASSWORD environment variables."
         }
     
     client = NationalGridMetroClient()
@@ -95,20 +96,21 @@ def home():
             "/usage": "Get usage and cost data"
         },
         "environment_variables_required": [
-            "USERNAME",
-            "PASSWORD"
+            "USERNAME or NATIONAL_GRID_USERNAME",
+            "PASSWORD or NATIONAL_GRID_PASSWORD"
         ]
     })
 
 if __name__ == '__main__':
     # Check if required environment variables are set
-    username = os.getenv('USERNAME')
-    password = os.getenv('PASSWORD')
+    # Support both USERNAME/PASSWORD and NATIONAL_GRID_USERNAME/NATIONAL_GRID_PASSWORD
+    username = os.getenv('USERNAME') or os.getenv('NATIONAL_GRID_USERNAME')
+    password = os.getenv('PASSWORD') or os.getenv('NATIONAL_GRID_PASSWORD')
     
     if not username or not password:
         print("Error: Missing required environment variables:")
-        print("  USERNAME")
-        print("  PASSWORD")
+        print("  USERNAME or NATIONAL_GRID_USERNAME")
+        print("  PASSWORD or NATIONAL_GRID_PASSWORD")
         print("\nExample usage:")
         print("  export USERNAME='your_username'")
         print("  export PASSWORD='your_password'")
