@@ -185,12 +185,29 @@ class NationalGridMetroClient:
                 if not submitted:
                     return {"success": False, "error": "Could not submit login form"}
                 
-                # Wait for login completion
-                wait.until(lambda driver: "myaccount.nationalgrid.com" in driver.current_url)
+                # Wait for login completion - try multiple approaches
+                try:
+                    # First, wait for redirect away from login page
+                    wait.until(lambda driver: "login.nationalgrid.com" not in driver.current_url)
+                    time.sleep(3)
+                    
+                    # If we're on an OAuth page, we may need to wait for automatic redirect
+                    if "oauth2" in driver.current_url or "b2c_" in driver.current_url:
+                        # Wait up to 30 seconds for OAuth completion
+                        WebDriverWait(driver, 30).until(
+                            lambda driver: "myaccount.nationalgrid.com" in driver.current_url
+                        )
+                    
+                    # Ensure we're actually on the main account page
+                    if "myaccount.nationalgrid.com" not in driver.current_url:
+                        return {"success": False, "error": f"Login didn't redirect to account page. Current URL: {driver.current_url}"}
+                        
+                except Exception as e:
+                    return {"success": False, "error": f"Login timeout or redirect failed: {str(e)}. Current URL: {driver.current_url}"}
                 
                 # Navigate to energy page to trigger opower authentication
                 driver.get(f"{self.auth_url}/Energy")
-                time.sleep(5)
+                time.sleep(10)  # Give more time for the Energy page to load and set up authentication
                 
                 # Extract tokens from browser storage
                 local_storage = driver.execute_script("return window.localStorage;")
@@ -250,11 +267,24 @@ class NationalGridMetroClient:
                         break
                 
                 if not access_token:
-                    # Debug output to see what tokens we found
-                    debug_info = {}
-                    for key, value in msal_data.items():
-                        if value and ('token' in key.lower() or 'auth' in key.lower() or 'msal' in key.lower()):
-                            debug_info[key] = str(value)[:100] + "..." if len(str(value)) > 100 else str(value)
+                    # Debug output to see ALL storage keys and values
+                    debug_info = {
+                        "localStorage_keys": list(local_storage.keys()),
+                        "sessionStorage_keys": list(session_storage.keys()),
+                        "localStorage_sample": {},
+                        "sessionStorage_sample": {},
+                        "current_url": driver.current_url
+                    }
+                    
+                    # Sample localStorage values (first 200 chars)
+                    for key, value in local_storage.items():
+                        if value:
+                            debug_info["localStorage_sample"][key] = str(value)[:200] + "..." if len(str(value)) > 200 else str(value)
+                    
+                    # Sample sessionStorage values (first 200 chars)  
+                    for key, value in session_storage.items():
+                        if value:
+                            debug_info["sessionStorage_sample"][key] = str(value)[:200] + "..." if len(str(value)) > 200 else str(value)
                     
                     return {"success": False, "error": "Failed to extract access token", "debug": debug_info}
                 
