@@ -1,6 +1,6 @@
 {
-  "name": "National Grid NYC Metro Stats",
-  "version": "1.0.0",
+  "name": "National Grid NYC Metro API",
+  "version": "1.0.1",
   "slug": "nationalgrid_nyc_metro",
   "description": "Get usage and cost data from National Grid NYC Metro accounts via REST API",
   "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],

@@ -12,7 +12,14 @@ import sys
 import os
 import base64
 from datetime import datetime, timedelta
-from playwright.async_api import async_playwright
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.keys import Keys
+import time
 
 class NationalGridMetroClient:
     def __init__(self):
@@ -121,83 +128,82 @@ class NationalGridMetroClient:
             return None
 
     async def login_and_get_tokens(self, username: str, password: str):
-        """Automated login using browser automation to get tokens."""
+        """Automated login using Selenium to get tokens."""
         try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                context = await browser.new_context(
-                    user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                page = await context.new_page()
-                
-                # Clear any existing session to ensure fresh login
-                await context.clear_cookies()
-                
-                # Navigate to login page (use actual login URL)
+            # Setup Chrome options for headless operation
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--allow-running-insecure-content")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            
+            # Set up Chrome service
+            chrome_service = None
+            if os.getenv('CHROMEDRIVER_PATH'):
+                chrome_service = Service(os.getenv('CHROMEDRIVER_PATH'))
+            
+            # Create driver
+            driver = webdriver.Chrome(service=chrome_service, options=chrome_options)
+            
+            try:
+                # Navigate to login page
                 login_url = f"{self.auth_url}/login"
-                await page.goto(login_url, wait_until="domcontentloaded", timeout=60000)
-                await page.wait_for_timeout(5000)
+                driver.get(login_url)
+                
+                # Wait for page load
+                time.sleep(5)
                 
                 # Wait for and fill username
-                await page.wait_for_selector('#signInName', timeout=20000)
-                await page.fill('#signInName', username)
+                wait = WebDriverWait(driver, 20)
+                username_field = wait.until(EC.presence_of_element_located((By.ID, "signInName")))
+                username_field.clear()
+                username_field.send_keys(username)
                 
                 # Wait for and fill password
-                await page.wait_for_selector('#password', timeout=10000)
-                await page.fill('#password', password)
+                password_field = wait.until(EC.presence_of_element_located((By.ID, "password")))
+                password_field.clear()
+                password_field.send_keys(password)
                 
-                # Submit form using multiple approaches (like the working script)
+                # Submit form
                 submitted = False
                 
-                # Try to find submit button by text
-                submit_selector = await page.query_selector('button:has-text("Sign in")') or \
-                                await page.query_selector('button:has-text("Log in")') or \
-                                await page.query_selector('button:has-text("Submit")') or \
-                                await page.query_selector('input[type="submit"]') or \
-                                await page.query_selector('button[type="submit"]')
-                
-                if submit_selector:
-                    await submit_selector.click()
+                # Try different submit methods
+                try:
+                    # Look for submit button
+                    submit_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Sign in')] | //button[contains(text(), 'Log in')] | //button[contains(text(), 'Submit')] | //input[@type='submit'] | //button[@type='submit']")
+                    submit_button.click()
                     submitted = True
-                else:
+                except:
                     # Fallback: Press Enter in password field
-                    await page.press('#password', 'Enter')
+                    password_field.send_keys(Keys.RETURN)
                     submitted = True
                 
                 if not submitted:
                     return {"success": False, "error": "Could not submit login form"}
                 
-                # Wait for login completion (wait for redirect to myaccount)
-                await page.wait_for_url("**/myaccount.nationalgrid.com/**", timeout=30000)
+                # Wait for login completion
+                wait.until(lambda driver: "myaccount.nationalgrid.com" in driver.current_url)
                 
                 # Navigate to energy page to trigger opower authentication
-                await page.goto(f"{self.auth_url}/Energy", wait_until='networkidle')
-                await page.wait_for_timeout(5000)
+                driver.get(f"{self.auth_url}/Energy")
+                time.sleep(5)
                 
-                # Extract MSAL tokens from browser storage
-                msal_data = await page.evaluate("""
-                    () => {
-                        const allData = {};
-                        
-                        // Check localStorage
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            allData[key] = localStorage.getItem(key);
-                        }
-                        
-                        // Check sessionStorage
-                        for (let i = 0; i < sessionStorage.length; i++) {
-                            const key = sessionStorage.key(i);
-                            allData['session_' + key] = sessionStorage.getItem(key);
-                        }
-                        
-                        return allData;
-                    }
-                """)
+                # Extract tokens from browser storage
+                local_storage = driver.execute_script("return window.localStorage;")
+                session_storage = driver.execute_script("return window.sessionStorage;")
                 
-                await browser.close()
+                # Combine storage data
+                msal_data = {}
+                for key, value in local_storage.items():
+                    msal_data[key] = value
+                for key, value in session_storage.items():
+                    msal_data[f'session_{key}'] = value
                 
-                # Extract access token from MSAL data - more comprehensive search
+                # Extract access token from storage data
                 access_token = None
                 
                 # Look for access token in various formats
@@ -258,6 +264,9 @@ class NationalGridMetroClient:
                 self.save_tokens(self.tokens)
                 
                 return {"success": True, "source": "fresh_login"}
+                
+            finally:
+                driver.quit()
                 
         except Exception as e:
             return {"success": False, "error": str(e)}

@@ -1,20 +1,21 @@
 # Use Home Assistant base image with Python support
 ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM ${BUILD_FROM}
 
 # Set environment variables for Home Assistant addon
-ENV LANG C.UTF-8
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+ENV LANG=C.UTF-8 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies needed for Playwright and browser automation
+# Install system dependencies needed for browser automation
 RUN apk add --no-cache \
     # Build dependencies
     gcc \
     g++ \
     musl-dev \
-    # Runtime dependencies for Playwright
+    # Runtime dependencies for Chromium
     chromium \
+    chromium-chromedriver \
     nss \
     freetype \
     freetype-dev \
@@ -28,9 +29,11 @@ RUN apk add --no-cache \
     # Cleanup
     && rm -rf /var/cache/apk/*
 
-# Set Playwright environment to use system Chromium
-ENV PLAYWRIGHT_BROWSERS_PATH=/usr/bin
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# Set Chrome/Chromium environment variables
+ENV CHROME_BIN=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/bin/chromium-browser \
+    CHROMIUM_PATH=/usr/bin/chromium-browser \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver
 
 # Set working directory
 WORKDIR /app

@@ -5,6 +5,24 @@ All notable changes to this Home Assistant add-on will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-07-22
+
+### Changed
+- **BREAKING**: Replaced Playwright with Selenium for browser automation
+- Updated Dockerfile to use Selenium WebDriver with Chromium
+- Improved ARM architecture compatibility (aarch64, armhf, armv7)
+- Fixed Dockerfile warnings for Home Assistant build system
+
+### Fixed
+- Build failures on ARM architectures due to Playwright incompatibility
+- ARG BUILD_FROM validation warning in Dockerfile
+- ENV format warnings in Dockerfile
+
+### Technical Details
+- Dependencies: playwright>=1.40.0 → selenium>=4.15.0
+- Browser: Uses system Chromium with chromedriver
+- Compatibility: Now works across all supported architectures
+
 ## [1.0.0] - 2025-07-22
 
 ### Added
