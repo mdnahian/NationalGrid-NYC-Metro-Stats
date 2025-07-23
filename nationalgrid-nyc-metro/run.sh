@@ -5,15 +5,44 @@
 # Starts the National Grid Flask API service
 # ==============================================================================
 
-# Get addon configuration
-USERNAME=$(bashio::config 'username')
-PASSWORD=$(bashio::config 'password')
-LOG_LEVEL=$(bashio::config 'log_level' 'info')
+# Function for logging that works in both HA and local environments
+log_info() {
+    if command -v bashio > /dev/null 2>&1; then
+        bashio::log.info "$1"
+    else
+        echo "[INFO] $1"
+    fi
+}
+
+log_error() {
+    if command -v bashio > /dev/null 2>&1; then
+        bashio::log.fatal "$1"
+    else
+        echo "[ERROR] $1"
+    fi
+}
+
+# Get addon configuration (with fallbacks for local testing)
+if command -v bashio > /dev/null 2>&1; then
+    # Running in Home Assistant
+    USERNAME=$(bashio::config 'username')
+    PASSWORD=$(bashio::config 'password')
+    LOG_LEVEL=$(bashio::config 'log_level' 'info')
+else
+    # Running in local test environment
+    USERNAME="$USERNAME"
+    PASSWORD="$PASSWORD"
+    LOG_LEVEL="${LOG_LEVEL:-info}"
+fi
 
 # Validate required configuration
 if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-    bashio::log.fatal "Username and password must be configured!"
-    bashio::log.fatal "Please configure the addon options in the Home Assistant UI."
+    log_error "Username and password must be configured!"
+    if command -v bashio > /dev/null 2>&1; then
+        log_error "Please configure the addon options in the Home Assistant UI."
+    else
+        log_error "Please set USERNAME and PASSWORD environment variables."
+    fi
     exit 1
 fi
 
@@ -28,10 +57,10 @@ chmod 755 /data/.ngnycmetro
 # Update the nationalgridmetro.py to use the addon data directory
 sed -i 's|~/.ngnycmetro|/data/.ngnycmetro|g' /app/internal/nationalgridmetro.py
 
-bashio::log.info "Starting National Grid NYC Metro API..."
-bashio::log.info "Username: ${USERNAME}"
-bashio::log.info "Log level: ${LOG_LEVEL}"
-bashio::log.info "API will be available on port 50583"
+log_info "Starting National Grid NYC Metro API..."
+log_info "Username: ${USERNAME}"
+log_info "Log level: ${LOG_LEVEL}"
+log_info "API will be available on port 50583"
 
 # Set Python logging level based on addon log level
 case "$LOG_LEVEL" in
